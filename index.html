@@ -197,11 +197,13 @@
     <video id="video" autoplay playsinline muted></video>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+
   <script type="module">
     import * as THREE from 'https://unpkg.com/three@0.161.0/build/three.module.js';
     import { OrbitControls } from 'https://unpkg.com/three@0.161.0/examples/jsm/controls/OrbitControls.js?module';
-    import { Hands } from 'https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js';
-    import { Camera } from 'https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js';
 
     const canvas = document.getElementById('scene');
     const video = document.getElementById('video');
@@ -263,7 +265,6 @@
     let gestureHold = { name: '', count: 0 };
     let shapeHold = { name: '', count: 0 };
     let clock = new THREE.Clock();
-    let frame = 0;
 
     const paletteMap = {
       attract: { h: 0.56, s: 0.9, l: 0.65 },
@@ -353,7 +354,6 @@
       const middleTip = landmarks[12];
       const ringTip = landmarks[16];
       const pinkyTip = landmarks[20];
-
       const indexPip = landmarks[6];
       const middlePip = landmarks[10];
       const ringPip = landmarks[14];
@@ -406,18 +406,20 @@
     }
 
     function spawnObject(type) {
-      const geometry = type === 'sphere'
+      const geo = type === 'sphere'
         ? new THREE.SphereGeometry(0.8 + Math.random() * 0.7, 20, 20)
         : new THREE.BoxGeometry(1.2, 1.2, 1.2);
 
-      const material = new THREE.MeshStandardMaterial({
+      const mat = new THREE.MeshStandardMaterial({
         color: type === 'sphere' ? 0x56ccff : 0xffb347,
         emissive: type === 'sphere' ? 0x225577 : 0x663300,
         metalness: 0.25,
-        roughness: 0.2
+        roughness: 0.2,
+        transparent: true,
+        opacity: 1
       });
 
-      const mesh = new THREE.Mesh(geometry, material);
+      const mesh = new THREE.Mesh(geo, mat);
       mesh.position.copy(handPoint.clone());
       mesh.position.z += (Math.random() - 0.5) * 3;
       mesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
@@ -452,7 +454,7 @@
       }
     }
 
-    function updateParticles(delta) {
+    function updateParticles() {
       const pos = particles.geometry.attributes.position.array;
       const time = clock.elapsedTime;
       particleGroup.rotation.y += currentMode === 'swirl' ? 0.006 : 0.0015;
@@ -494,9 +496,7 @@
         const homePull = currentMode === 'freeze' ? 0.002 : 0.006;
         const toBase = base.clone().sub(p).multiplyScalar(homePull);
         v.add(toBase);
-
-        const damping = currentMode === 'freeze' ? 0.92 : 0.975;
-        v.multiplyScalar(damping);
+        v.multiplyScalar(currentMode === 'freeze' ? 0.92 : 0.975);
         p.add(v);
 
         pos[index] = p.x;
@@ -516,7 +516,6 @@
         mesh.rotation.y += 0.018;
         mesh.userData.life -= 1;
         mesh.material.opacity = Math.max(0, mesh.userData.life / 220);
-        mesh.material.transparent = true;
         if (mesh.userData.life <= 0) {
           mesh.geometry.dispose();
           mesh.material.dispose();
@@ -527,8 +526,6 @@
 
     function animate() {
       requestAnimationFrame(animate);
-      const delta = clock.getDelta();
-      frame++;
 
       if (handDetected) {
         fieldSphere.visible = true;
@@ -545,7 +542,7 @@
         fieldSphere.visible = false;
       }
 
-      updateParticles(delta);
+      updateParticles();
       updateSpawnedObjects();
       pointLight.position.x = Math.sin(clock.elapsedTime * 0.7) * 12;
       pointLight.position.y = Math.cos(clock.elapsedTime * 0.9) * 8;
@@ -560,7 +557,7 @@
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     });
 
-    const hands = new Hands({
+    const hands = new window.Hands({
       locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
     });
 
@@ -604,20 +601,26 @@
     let webcamCamera = null;
     async function startCamera() {
       try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          throw new Error('Camera API is not available in this browser.');
+        }
+
         setStatus('Starting camera...', '#60a5fa');
-        webcamCamera = new Camera(video, {
+
+        webcamCamera = new window.Camera(video, {
           onFrame: async () => {
             await hands.send({ image: video });
           },
           width: 640,
           height: 480
         });
+
         await webcamCamera.start();
         setStatus('Camera started. Use hand gestures to control the 3D scene!', '#22c55e');
       } catch (error) {
         console.error(error);
-        setStatus('Camera access failed. Please allow camera permission.', '#ef4444');
-        alert('Unable to access camera. Please allow webcam permission and try again.');
+        setStatus(`Camera error: ${error.message}`, '#ef4444');
+        alert(`Camera failed: ${error.message}`);
       }
     }
 
