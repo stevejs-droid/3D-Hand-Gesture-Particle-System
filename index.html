@@ -1,114 +1,335 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ad Style Hand Ribbon</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Point Follow Ribbon</title>
 <style>
-body {margin:0; overflow:hidden; background:black;}
-video {position:fixed; bottom:10px; right:10px; width:140px; border-radius:10px; opacity:0.8; transform:scaleX(-1);} 
+  html, body {
+    margin: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: radial-gradient(circle at 50% 70%, #10162b 0%, #050913 45%, #000 100%);
+    font-family: Arial, sans-serif;
+  }
+
+  canvas.webgl {
+    display: block;
+  }
+
+  #video {
+    position: fixed;
+    right: 14px;
+    bottom: 14px;
+    width: 170px;
+    border-radius: 14px;
+    opacity: 0.78;
+    transform: scaleX(-1);
+    border: 1px solid rgba(255,255,255,0.12);
+    background: #000;
+    z-index: 5;
+  }
+
+  .hint {
+    position: fixed;
+    top: 14px;
+    left: 14px;
+    color: white;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12);
+    backdrop-filter: blur(10px);
+    padding: 12px 15px;
+    border-radius: 16px;
+    z-index: 6;
+    max-width: 330px;
+    line-height: 1.45;
+  }
+
+  .hint b {
+    display: block;
+    font-size: 20px;
+    margin-bottom: 4px;
+  }
+
+  .hint span {
+    font-size: 13px;
+    opacity: 0.88;
+  }
+
+  .status {
+    color: #9effac;
+    margin-top: 6px;
+    font-size: 12px;
+  }
+
+  @media (max-width: 700px) {
+    #video {
+      width: 120px;
+    }
+
+    .hint {
+      max-width: calc(100vw - 28px);
+    }
+  }
 </style>
 </head>
 <body>
-<video id="video" autoplay playsinline muted></video>
+  <div class="hint">
+    <b>Point Follow Ribbon</b>
+    <span>Point with your index finger. The glowing ribbon will slide to where you point.</span>
+    <div id="status" class="status">Starting camera...</div>
+  </div>
+  <video id="video" autoplay playsinline muted></video>
 
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
 
-<script type="importmap">
-{
- "imports": {
-  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
- }
-}
-</script>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
+    }
+  }
+  </script>
 
-<script type="module">
-import * as THREE from 'three';
+  <script type="module">
+    import * as THREE from 'three';
 
-const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight,0.1,1000);
-camera.position.z = 40;
+    const statusEl = document.getElementById('status');
+    const video = document.getElementById('video');
 
-const renderer = new THREE.WebGLRenderer({antialias:true});
-renderer.setSize(innerWidth,innerHeight);
-document.body.appendChild(renderer.domElement);
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.Fog(0x02040c, 35, 130);
 
-// PARTICLES (RIBBON)
-const count = 2000;
-const pos = new Float32Array(count*3);
+    const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 8, 42);
+    camera.lookAt(0, 5, 0);
 
-for(let i=0;i<count;i++){
-  let t = i/count;
-  pos[i*3] = (t-0.5)*80;
-  pos[i*3+1] = Math.sin(t*Math.PI)*5;
-  pos[i*3+2] = 0;
-}
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.domElement.className = 'webgl';
+    document.body.appendChild(renderer.domElement);
 
-const geo = new THREE.BufferGeometry();
-geo.setAttribute('position', new THREE.BufferAttribute(pos,3));
+    scene.add(new THREE.AmbientLight(0xffffff, 0.8));
 
-const mat = new THREE.PointsMaterial({
- size:0.5,
- color:0x00ff99,
- transparent:true,
- opacity:0.9
-});
+    const dir = new THREE.DirectionalLight(0xffffff, 0.8);
+    dir.position.set(10, 18, 10);
+    scene.add(dir);
 
-const points = new THREE.Points(geo,mat);
-scene.add(points);
+    const starGeo = new THREE.BufferGeometry();
+    const starCount = 450;
+    const starPos = new Float32Array(starCount * 3);
+    for (let i = 0; i < starCount; i++) {
+      starPos[i * 3] = (Math.random() - 0.5) * 160;
+      starPos[i * 3 + 1] = (Math.random() - 0.1) * 70;
+      starPos[i * 3 + 2] = -Math.random() * 120;
+    }
+    starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+    const stars = new THREE.Points(
+      starGeo,
+      new THREE.PointsMaterial({ color: 0xc8d8ff, size: 0.16, transparent: true, opacity: 0.8 })
+    );
+    scene.add(stars);
 
-// HAND CONTROL
-const video = document.getElementById('video');
-let handX = 0;
-let handY = 0;
+    const particleCount = 2600;
+    const positions = new Float32Array(particleCount * 3);
+    const colors = new Float32Array(particleCount * 3);
+    const baseData = [];
 
-const hands = new Hands({locateFile:(f)=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`});
+    const geometry = new THREE.BufferGeometry();
 
-hands.setOptions({maxNumHands:1});
+    const c1 = new THREE.Color('#39ff8f');
+    const c2 = new THREE.Color('#d7ff37');
+    const c3 = new THREE.Color('#00f7ff');
 
-hands.onResults((res)=>{
- if(res.multiHandLandmarks.length>0){
-  let tip = res.multiHandLandmarks[0][8];
-  handX = (0.5 - tip.x)*50;
-  handY = (0.5 - tip.y)*20;
- }
-});
+    for (let i = 0; i < particleCount; i++) {
+      const u = i / particleCount;
+      const across = (Math.random() - 0.5) * 85;
+      const thickness = (Math.random() - 0.5) * 3.2;
+      const jitter = Math.random() * Math.PI * 2;
 
-const cam = new Camera(video,{
- onFrame: async ()=> await hands.send({image:video}),
- width:640,height:480
-});
+      positions[i * 3] = across;
+      positions[i * 3 + 1] = 8 + thickness;
+      positions[i * 3 + 2] = 0;
 
-navigator.mediaDevices.getUserMedia({video:true}).then(stream=>{
- video.srcObject = stream;
- cam.start();
-});
+      const blend = Math.sin(u * Math.PI);
+      const col = c1.clone().lerp(c2, blend).lerp(c3, Math.random() * 0.15);
+      colors[i * 3] = col.r;
+      colors[i * 3 + 1] = col.g;
+      colors[i * 3 + 2] = col.b;
 
-// ANIMATION (KEY CHANGE)
-function animate(){
- requestAnimationFrame(animate);
- let p = geo.attributes.position.array;
+      baseData.push({
+        u,
+        across,
+        thickness,
+        waveOffset: jitter,
+        depthOffset: (Math.random() - 0.5) * 3.5,
+        individualLag: 0.035 + Math.random() * 0.03
+      });
+    }
 
- for(let i=0;i<count;i++){
-  let baseX = (i/count-0.5)*80;
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
-  // smooth ribbon follow
-  p[i*3] += ((baseX + handX) - p[i*3]) * 0.05;
-  p[i*3+1] += ((Math.sin(i*0.02)*5 + handY) - p[i*3+1]) * 0.05;
- }
+    const material = new THREE.PointsMaterial({
+      size: 0.5,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.95,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      sizeAttenuation: true
+    });
 
- geo.attributes.position.needsUpdate = true;
- renderer.render(scene,camera);
-}
+    const ribbon = new THREE.Points(geometry, material);
+    scene.add(ribbon);
 
-animate();
+    const hand = {
+      seen: false,
+      targetX: 0,
+      targetY: 7,
+      x: 0,
+      y: 7,
+      vx: 0,
+      vy: 0,
+      pinch: false
+    };
 
-addEventListener('resize',()=>{
- camera.aspect = innerWidth/innerHeight;
- camera.updateProjectionMatrix();
- renderer.setSize(innerWidth,innerHeight);
-});
-</script>
+    const ribbonState = {
+      centerX: 0,
+      centerY: 7,
+      bend: 0,
+      slope: 0,
+      lift: 0
+    };
+
+    function updateHandFromLandmarks(landmarks) {
+      const tip = landmarks[8];
+      const thumb = landmarks[4];
+      const pinchDist = Math.hypot(tip.x - thumb.x, tip.y - thumb.y, tip.z - thumb.z);
+
+      hand.seen = true;
+      hand.targetX = (0.5 - tip.x) * 55;
+      hand.targetY = 4 + (0.5 - tip.y) * 18;
+      hand.pinch = pinchDist < 0.06;
+
+      statusEl.textContent = hand.pinch
+        ? 'Hand detected. Pinch makes the ribbon tighter.'
+        : 'Hand detected. Point somewhere and the ribbon goes there.';
+    }
+
+    const hands = new Hands({
+      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+    });
+
+    hands.setOptions({
+      maxNumHands: 1,
+      modelComplexity: 1,
+      minDetectionConfidence: 0.6,
+      minTrackingConfidence: 0.6
+    });
+
+    hands.onResults((results) => {
+      if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+        updateHandFromLandmarks(results.multiHandLandmarks[0]);
+      } else {
+        hand.seen = false;
+        statusEl.textContent = 'No hand detected. Show only one hand clearly to the camera.';
+      }
+    });
+
+    let mpCamera = null;
+
+    async function startCamera() {
+      try {
+        statusEl.textContent = 'Requesting camera access...';
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: 640, height: 480, facingMode: 'user' },
+          audio: false
+        });
+
+        video.srcObject = stream;
+        await video.play();
+
+        mpCamera = new Camera(video, {
+          onFrame: async () => {
+            await hands.send({ image: video });
+          },
+          width: 640,
+          height: 480
+        });
+
+        mpCamera.start();
+        statusEl.textContent = 'Camera started. Point with your finger.';
+      } catch (err) {
+        console.error(err);
+        statusEl.textContent = 'Camera failed. Allow permission and run on GitHub Pages or localhost.';
+      }
+    }
+
+    if (location.protocol === 'https:' || location.hostname === 'localhost') {
+      startCamera();
+    } else {
+      statusEl.textContent = 'This needs HTTPS. GitHub Pages will work.';
+    }
+
+    const clock = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const t = clock.getElapsedTime();
+      const pos = geometry.attributes.position.array;
+
+      if (hand.seen) {
+        hand.x += (hand.targetX - hand.x) * 0.12;
+        hand.y += (hand.targetY - hand.y) * 0.12;
+      } else {
+        hand.x += (0 - hand.x) * 0.03;
+        hand.y += (7 - hand.y) * 0.03;
+      }
+
+      const dx = hand.x - ribbonState.centerX;
+      const dy = hand.y - ribbonState.centerY;
+      hand.vx = hand.vx * 0.82 + dx * 0.03;
+      hand.vy = hand.vy * 0.82 + dy * 0.03;
+
+      ribbonState.centerX += hand.vx;
+      ribbonState.centerY += hand.vy;
+      ribbonState.slope += ((hand.x - ribbonState.centerX) * 0.02 - ribbonState.slope) * 0.06;
+      ribbonState.bend += ((hand.y - ribbonState.centerY) * 0.12 - ribbonState.bend) * 0.05;
+      ribbonState.lift += (((hand.pinch ? 1.6 : 0.9) * 1.2) - ribbonState.lift) * 0.05;
+
+      for (let i = 0; i < particleCount; i++) {
+        const d = baseData[i];
+        const nx = d.across / 42;
+        const arc = -Math.pow(nx, 2) * (hand.pinch ? 9.5 : 7.2) + 3.8;
+        const wave = Math.sin(d.u * Math.PI * 2.5 + t * 2.2 + d.waveOffset) * 0.42;
+        const flutter = Math.cos(d.u * Math.PI * 5.0 - t * 1.6 + d.waveOffset) * 0.15;
+
+        const targetX = ribbonState.centerX + d.across;
+        const targetY = ribbonState.centerY + arc + d.thickness * ribbonState.lift + wave + flutter + d.across * ribbonState.slope * 0.12;
+        const targetZ = d.depthOffset + Math.sin(d.u * Math.PI * 3 + t * 1.5) * 0.6 + Math.abs(nx) * 2.8;
+
+        pos[i * 3] += (targetX - pos[i * 3]) * d.individualLag;
+        pos[i * 3 + 1] += (targetY - pos[i * 3 + 1]) * d.individualLag;
+        pos[i * 3 + 2] += (targetZ - pos[i * 3 + 2]) * d.individualLag;
+      }
+
+      geometry.attributes.position.needsUpdate = true;
+      stars.rotation.y += 0.0005;
+      renderer.render(scene, camera);
+    }
+
+    animate();
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    });
+  </script>
 </body>
 </html>
