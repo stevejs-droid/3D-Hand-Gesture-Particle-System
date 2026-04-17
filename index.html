@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Three.js Hand Controlled 3D Particles</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #020617;
+      font-family: Arial, sans-serif;
+      color: white;
+    }
+    #app {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+    }
+    #scene {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    #video {
+      position: absolute;
+      right: 20px;
+      bottom: 20px;
+      width: 240px;
+      height: 180px;
+      border-radius: 16px;
+      border: 2px solid rgba(255,255,255,0.14);
+      object-fit: cover;
+      transform: scaleX(-1);
+      background: #000;
+      opacity: 0.92;
+      box-shadow: 0 12px 30px rgba(0,0,0,0.35);
+      z-index: 4;
+    }
+    .panel, .info, .status {
+      position: absolute;
+      background: rgba(255,255,255,0.08);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.12);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+      z-index: 4;
+    }
+    .panel {
+      left: 20px;
+      top: 20px;
+      max-width: 450px;
+      padding: 16px 18px;
+      border-radius: 18px;
+      line-height: 1.45;
+    }
+    .panel h1 {
+      font-size: 22px;
+      margin-bottom: 8px;
+    }
+    .panel p {
+      font-size: 14px;
+      color: rgba(255,255,255,0.9);
+      margin-bottom: 6px;
+    }
+    .panel .small {
+      font-size: 13px;
+      color: rgba(255,255,255,0.72);
+    }
+    .badge-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .badge {
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.1);
+      font-size: 12px;
+    }
+    .info {
+      right: 20px;
+      top: 20px;
+      min-width: 260px;
+      padding: 14px 16px;
+      border-radius: 16px;
+    }
+    .info h2 {
+      font-size: 16px;
+      margin-bottom: 8px;
+    }
+    .info p {
+      font-size: 13px;
+      color: rgba(255,255,255,0.9);
+      margin-bottom: 4px;
+    }
+    .status {
+      left: 20px;
+      bottom: 20px;
+      padding: 10px 14px;
+      border-radius: 14px;
+      font-size: 14px;
+    }
+    .dot {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #fbbf24;
+      box-shadow: 0 0 12px #fbbf24;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+    button {
+      margin-top: 10px;
+      padding: 10px 14px;
+      border: none;
+      border-radius: 12px;
+      background: #2563eb;
+      color: white;
+      cursor: pointer;
+      font-size: 14px;
+      transition: transform 0.15s ease, opacity 0.15s ease;
+    }
+    button:hover {
+      transform: translateY(-1px);
+      opacity: 0.95;
+    }
+    @media (max-width: 700px) {
+      .panel {
+        left: 12px;
+        top: 12px;
+        right: 12px;
+        max-width: none;
+      }
+      .info {
+        left: 12px;
+        right: 12px;
+        top: auto;
+        bottom: 155px;
+      }
+      .status {
+        left: 12px;
+        bottom: 12px;
+        max-width: calc(100vw - 200px);
+      }
+      #video {
+        width: 170px;
+        height: 128px;
+        right: 12px;
+        bottom: 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <canvas id="scene"></canvas>
+
+    <div class="panel">
+      <h1>🌌 Real 3D Hand Particle World</h1>
+      <p><strong>Open palm:</strong> attract particles</p>
+      <p><strong>Pinch:</strong> explode particles</p>
+      <p><strong>One finger:</strong> neon mode</p>
+      <p><strong>Two fingers:</strong> swirl galaxy mode</p>
+      <p><strong>Fist:</strong> freeze mode</p>
+      <p><strong>Three fingers:</strong> spawn 3D spheres</p>
+      <p><strong>Thumb + pinky:</strong> spawn 3D cubes</p>
+      <p class="small">This version uses real 3D particles with Three.js and hand tracking from your webcam.</p>
+      <div class="badge-row">
+        <span class="badge">Three.js</span>
+        <span class="badge">Real 3D</span>
+        <span class="badge">Gesture Control</span>
+        <span class="badge">Shape Spawning</span>
+      </div>
+      <button id="startBtn">Start Camera</button>
+    </div>
+
+    <div class="info">
+      <h2>Live Info</h2>
+      <p id="gestureText">Gesture: None</p>
+      <p id="modeText">Mode: Attract</p>
+      <p id="shapeText">Spawned Shape: None</p>
+      <p id="depthText">Depth: Mid</p>
+    </div>
+
+    <div class="status" id="status">
+      <span class="dot"></span>
+      Waiting to start camera...
+    </div>
+
+    <video id="video" autoplay playsinline muted></video>
+  </div>
+
+  <script type="module">
+    import * as THREE from 'https://unpkg.com/three@0.161.0/build/three.module.js';
+    import { OrbitControls } from 'https://unpkg.com/three@0.161.0/examples/jsm/controls/OrbitControls.js?module';
+    import { Hands } from 'https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js';
+    import { Camera } from 'https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js';
+
+    const canvas = document.getElementById('scene');
+    const video = document.getElementById('video');
+    const statusBox = document.getElementById('status');
+    const startBtn = document.getElementById('startBtn');
+    const gestureText = document.getElementById('gestureText');
+    const modeText = document.getElementById('modeText');
+    const shapeText = document.getElementById('shapeText');
+    const depthText = document.getElementById('depthText');
+
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x020617, 0.018);
+
+    const camera3D = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera3D.position.set(0, 0, 28);
+
+    const controls = new OrbitControls(camera3D, renderer.domElement);
+    controls.enableDamping = true;
+    controls.enablePan = false;
+    controls.enableZoom = false;
+    controls.autoRotate = false;
+    controls.enabled = false;
+
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
+    scene.add(ambientLight);
+
+    const pointLight = new THREE.PointLight(0x88ccff, 2.2, 120);
+    pointLight.position.set(8, 10, 18);
+    scene.add(pointLight);
+
+    const backLight = new THREE.PointLight(0xff66dd, 1.2, 120);
+    backLight.position.set(-10, -8, -10);
+    scene.add(backLight);
+
+    const particleGroup = new THREE.Group();
+    scene.add(particleGroup);
+
+    const spawnedGroup = new THREE.Group();
+    scene.add(spawnedGroup);
+
+    const particleCount = 1200;
+    const positions = new Float32Array(particleCount * 3);
+    const colors = new Float32Array(particleCount * 3);
+    const velocities = [];
+    const basePositions = [];
+    const color = new THREE.Color();
+
+    let currentMode = 'attract';
+    let currentGesture = 'None';
+    let lastSpawnShape = 'None';
+    let pinchActive = false;
+    let pinchStrength = 0;
+    let handDetected = false;
+    let handPoint = new THREE.Vector3(0, 0, 0);
+    let gestureHold = { name: '', count: 0 };
+    let shapeHold = { name: '', count: 0 };
+    let clock = new THREE.Clock();
+    let frame = 0;
+
+    const paletteMap = {
+      attract: { h: 0.56, s: 0.9, l: 0.65 },
+      explode: { h: 0.04, s: 0.95, l: 0.6 },
+      neon: { h: 0.86, s: 1.0, l: 0.65 },
+      swirl: { h: 0.75, s: 0.9, l: 0.65 },
+      freeze: { h: 0.5, s: 0.85, l: 0.72 }
+    };
+
+    function setStatus(text, colorHex = '#fbbf24') {
+      statusBox.innerHTML = `<span class="dot" style="background:${colorHex}; box-shadow: 0 0 12px ${colorHex}"></span>${text}`;
+    }
+
+    function updateInfo() {
+      gestureText.textContent = `Gesture: ${currentGesture}`;
+      modeText.textContent = `Mode: ${currentMode.charAt(0).toUpperCase() + currentMode.slice(1)}`;
+      shapeText.textContent = `Spawned Shape: ${lastSpawnShape}`;
+      depthText.textContent = `Depth: ${handPoint.z > 6 ? 'Far' : handPoint.z < -6 ? 'Near' : 'Mid'}`;
+    }
+
+    function applyPalette(mode) {
+      const p = paletteMap[mode] || paletteMap.attract;
+      for (let i = 0; i < particleCount; i++) {
+        color.setHSL((p.h + (i % 40) / 200) % 1, p.s, Math.min(0.8, p.l + (i % 5) * 0.01));
+        colors[i * 3] = color.r;
+        colors[i * 3 + 1] = color.g;
+        colors[i * 3 + 2] = color.b;
+      }
+      particles.geometry.attributes.color.needsUpdate = true;
+    }
+
+    for (let i = 0; i < particleCount; i++) {
+      const radius = 9 + Math.random() * 7;
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(2 * Math.random() - 1);
+
+      const x = radius * Math.sin(phi) * Math.cos(theta);
+      const y = radius * Math.sin(phi) * Math.sin(theta);
+      const z = radius * Math.cos(phi);
+
+      positions[i * 3] = x;
+      positions[i * 3 + 1] = y;
+      positions[i * 3 + 2] = z;
+      basePositions.push(new THREE.Vector3(x, y, z));
+      velocities.push(new THREE.Vector3(
+        (Math.random() - 0.5) * 0.08,
+        (Math.random() - 0.5) * 0.08,
+        (Math.random() - 0.5) * 0.08
+      ));
+    }
+
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+    const material = new THREE.PointsMaterial({
+      size: 0.22,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.95,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      sizeAttenuation: true
+    });
+
+    const particles = new THREE.Points(geometry, material);
+    particleGroup.add(particles);
+    applyPalette('attract');
+
+    const fieldSphere = new THREE.Mesh(
+      new THREE.SphereGeometry(0.45, 24, 24),
+      new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 })
+    );
+    fieldSphere.visible = false;
+    scene.add(fieldSphere);
+
+    function screenToWorld(nx, ny, nz = 0) {
+      const vector = new THREE.Vector3(nx, ny, nz).unproject(camera3D);
+      const dir = vector.sub(camera3D.position).normalize();
+      const distance = (0 - camera3D.position.z) / dir.z;
+      return camera3D.position.clone().add(dir.multiplyScalar(distance));
+    }
+
+    function detectGesture(landmarks) {
+      const thumbTip = landmarks[4];
+      const indexTip = landmarks[8];
+      const middleTip = landmarks[12];
+      const ringTip = landmarks[16];
+      const pinkyTip = landmarks[20];
+
+      const indexPip = landmarks[6];
+      const middlePip = landmarks[10];
+      const ringPip = landmarks[14];
+      const pinkyPip = landmarks[18];
+
+      const indexUp = indexTip.y < indexPip.y;
+      const middleUp = middleTip.y < middlePip.y;
+      const ringUp = ringTip.y < ringPip.y;
+      const pinkyUp = pinkyTip.y < pinkyPip.y;
+
+      const pinchDx = indexTip.x - thumbTip.x;
+      const pinchDy = indexTip.y - thumbTip.y;
+      const pinchDist = Math.sqrt(pinchDx * pinchDx + pinchDy * pinchDy);
+      pinchActive = pinchDist < 0.06;
+      pinchStrength = Math.max(0, 0.07 - pinchDist) / 0.07;
+
+      if (pinchActive) return 'Pinch';
+
+      const fingersUp = [indexUp, middleUp, ringUp, pinkyUp].filter(Boolean).length;
+      const thumbPinkyGesture = Math.abs(thumbTip.y - pinkyTip.y) < 0.12 && !indexUp && !middleUp && !ringUp;
+
+      if (fingersUp === 4) return 'Open Palm';
+      if (indexUp && !middleUp && !ringUp && !pinkyUp) return 'One Finger';
+      if (indexUp && middleUp && !ringUp && !pinkyUp) return 'Two Fingers';
+      if (indexUp && middleUp && ringUp && !pinkyUp) return 'Three Fingers';
+      if (thumbPinkyGesture) return 'Thumb Pinky';
+      if (fingersUp === 0) return 'Fist';
+      return 'Unknown';
+    }
+
+    function setMode(mode, gestureName, colorHex) {
+      currentMode = mode;
+      currentGesture = gestureName;
+      applyPalette(mode);
+      setStatus(`${gestureName}: ${mode} mode`, colorHex);
+      updateInfo();
+    }
+
+    function applyGestureState(gestureName) {
+      if (gestureHold.name === gestureName) gestureHold.count++;
+      else gestureHold = { name: gestureName, count: 1 };
+
+      if (gestureHold.count < 4) return;
+
+      if (gestureName === 'Open Palm') setMode('attract', gestureName, '#22c55e');
+      else if (gestureName === 'Pinch') setMode('explode', gestureName, '#fb7185');
+      else if (gestureName === 'One Finger') setMode('neon', gestureName, '#e879f9');
+      else if (gestureName === 'Two Fingers') setMode('swirl', gestureName, '#a78bfa');
+      else if (gestureName === 'Fist') setMode('freeze', gestureName, '#67e8f9');
+    }
+
+    function spawnObject(type) {
+      const geometry = type === 'sphere'
+        ? new THREE.SphereGeometry(0.8 + Math.random() * 0.7, 20, 20)
+        : new THREE.BoxGeometry(1.2, 1.2, 1.2);
+
+      const material = new THREE.MeshStandardMaterial({
+        color: type === 'sphere' ? 0x56ccff : 0xffb347,
+        emissive: type === 'sphere' ? 0x225577 : 0x663300,
+        metalness: 0.25,
+        roughness: 0.2
+      });
+
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.position.copy(handPoint.clone());
+      mesh.position.z += (Math.random() - 0.5) * 3;
+      mesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+      mesh.userData.velocity = new THREE.Vector3(
+        (Math.random() - 0.5) * 0.25,
+        (Math.random() - 0.5) * 0.25,
+        -0.08 - Math.random() * 0.12
+      );
+      mesh.userData.life = 220;
+      spawnedGroup.add(mesh);
+      lastSpawnShape = type === 'sphere' ? 'Sphere' : 'Cube';
+      updateInfo();
+    }
+
+    function applyShapeGesture(gestureName) {
+      if (gestureName !== 'Three Fingers' && gestureName !== 'Thumb Pinky') {
+        shapeHold = { name: '', count: 0 };
+        return;
+      }
+
+      if (shapeHold.name === gestureName) shapeHold.count++;
+      else shapeHold = { name: gestureName, count: 1 };
+
+      if (shapeHold.count === 6) {
+        if (gestureName === 'Three Fingers') {
+          for (let i = 0; i < 4; i++) spawnObject('sphere');
+          setStatus('Three fingers: spawned 3D spheres', '#38bdf8');
+        } else {
+          for (let i = 0; i < 4; i++) spawnObject('cube');
+          setStatus('Thumb + pinky: spawned 3D cubes', '#f59e0b');
+        }
+      }
+    }
+
+    function updateParticles(delta) {
+      const pos = particles.geometry.attributes.position.array;
+      const time = clock.elapsedTime;
+      particleGroup.rotation.y += currentMode === 'swirl' ? 0.006 : 0.0015;
+      particleGroup.rotation.x = Math.sin(time * 0.2) * 0.15;
+
+      for (let i = 0; i < particleCount; i++) {
+        const index = i * 3;
+        const p = new THREE.Vector3(pos[index], pos[index + 1], pos[index + 2]);
+        const v = velocities[i];
+        const base = basePositions[i];
+
+        v.x += Math.sin(time * 1.3 + i * 0.1) * 0.0012;
+        v.y += Math.cos(time * 1.1 + i * 0.12) * 0.0012;
+        v.z += Math.sin(time * 0.9 + i * 0.15) * 0.001;
+
+        if (handDetected) {
+          const dir = handPoint.clone().sub(p);
+          const dist = dir.length();
+          const range = 13.5;
+          if (dist < range) {
+            dir.normalize();
+            const strength = (1 - dist / range);
+
+            if (currentMode === 'explode' || pinchActive) {
+              v.addScaledVector(dir, -0.18 * strength * (1 + pinchStrength * 3));
+            } else if (currentMode === 'attract') {
+              v.addScaledVector(dir, 0.06 * strength);
+            } else if (currentMode === 'neon') {
+              v.addScaledVector(dir, 0.08 * strength);
+            } else if (currentMode === 'freeze') {
+              v.multiplyScalar(0.9);
+            } else if (currentMode === 'swirl') {
+              const swirl = new THREE.Vector3(-dir.y, dir.x, dir.z * 0.4).normalize();
+              v.addScaledVector(swirl, 0.08 * strength);
+            }
+          }
+        }
+
+        const homePull = currentMode === 'freeze' ? 0.002 : 0.006;
+        const toBase = base.clone().sub(p).multiplyScalar(homePull);
+        v.add(toBase);
+
+        const damping = currentMode === 'freeze' ? 0.92 : 0.975;
+        v.multiplyScalar(damping);
+        p.add(v);
+
+        pos[index] = p.x;
+        pos[index + 1] = p.y;
+        pos[index + 2] = p.z;
+      }
+
+      particles.geometry.attributes.position.needsUpdate = true;
+      material.size = currentMode === 'neon' ? 0.28 : 0.22;
+    }
+
+    function updateSpawnedObjects() {
+      for (let i = spawnedGroup.children.length - 1; i >= 0; i--) {
+        const mesh = spawnedGroup.children[i];
+        mesh.position.add(mesh.userData.velocity);
+        mesh.rotation.x += 0.02;
+        mesh.rotation.y += 0.018;
+        mesh.userData.life -= 1;
+        mesh.material.opacity = Math.max(0, mesh.userData.life / 220);
+        mesh.material.transparent = true;
+        if (mesh.userData.life <= 0) {
+          mesh.geometry.dispose();
+          mesh.material.dispose();
+          spawnedGroup.remove(mesh);
+        }
+      }
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const delta = clock.getDelta();
+      frame++;
+
+      if (handDetected) {
+        fieldSphere.visible = true;
+        fieldSphere.position.copy(handPoint);
+        const s = currentMode === 'explode' ? 1 + pinchStrength * 1.2 : 0.75;
+        fieldSphere.scale.setScalar(s);
+        fieldSphere.material.color.set(
+          currentMode === 'explode' ? 0xff6b6b :
+          currentMode === 'swirl' ? 0xbb88ff :
+          currentMode === 'neon' ? 0xff55dd :
+          currentMode === 'freeze' ? 0x77ffff : 0x77bbff
+        );
+      } else {
+        fieldSphere.visible = false;
+      }
+
+      updateParticles(delta);
+      updateSpawnedObjects();
+      pointLight.position.x = Math.sin(clock.elapsedTime * 0.7) * 12;
+      pointLight.position.y = Math.cos(clock.elapsedTime * 0.9) * 8;
+      controls.update();
+      renderer.render(scene, camera3D);
+    }
+
+    window.addEventListener('resize', () => {
+      camera3D.aspect = window.innerWidth / window.innerHeight;
+      camera3D.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    });
+
+    const hands = new Hands({
+      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+    });
+
+    hands.setOptions({
+      maxNumHands: 1,
+      modelComplexity: 1,
+      minDetectionConfidence: 0.65,
+      minTrackingConfidence: 0.65
+    });
+
+    hands.onResults((results) => {
+      if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+        const landmarks = results.multiHandLandmarks[0];
+        const indexTip = landmarks[8];
+        const wrist = landmarks[0];
+
+        const nx = (1 - indexTip.x) * 2 - 1;
+        const ny = -(indexTip.y * 2 - 1);
+        const world = screenToWorld(nx, ny, 0.2);
+        handPoint.copy(world);
+        handPoint.z = THREE.MathUtils.clamp((wrist.z - indexTip.z) * 140, -10, 10);
+
+        handDetected = true;
+        const gestureName = detectGesture(landmarks);
+        currentGesture = gestureName;
+        applyGestureState(gestureName);
+        applyShapeGesture(gestureName);
+        updateInfo();
+      } else {
+        handDetected = false;
+        pinchActive = false;
+        pinchStrength = 0;
+        currentGesture = 'None';
+        gestureHold = { name: '', count: 0 };
+        shapeHold = { name: '', count: 0 };
+        updateInfo();
+        setStatus('Show your hand to the camera', '#fbbf24');
+      }
+    });
+
+    let webcamCamera = null;
+    async function startCamera() {
+      try {
+        setStatus('Starting camera...', '#60a5fa');
+        webcamCamera = new Camera(video, {
+          onFrame: async () => {
+            await hands.send({ image: video });
+          },
+          width: 640,
+          height: 480
+        });
+        await webcamCamera.start();
+        setStatus('Camera started. Use hand gestures to control the 3D scene!', '#22c55e');
+      } catch (error) {
+        console.error(error);
+        setStatus('Camera access failed. Please allow camera permission.', '#ef4444');
+        alert('Unable to access camera. Please allow webcam permission and try again.');
+      }
+    }
+
+    startBtn.addEventListener('click', startCamera);
+    updateInfo();
+    animate();
+  </script>
+</body>
+</html>
