@@ -136,11 +136,11 @@
   <div class="panel">
     <div class="label">🎮 Gesture Controls</div>
     <h1 id="stateTitle">No Hand Detected</h1>
-    <div class="gesture">🖐 Open Hand → Expand Field</div>
-    <div class="gesture">☝ Point / ✊ Fist → Pull In</div>
+    <div class="gesture">🖐 Open Hand → Zoom In</div>
+    <div class="gesture">☝ Point / ✊ Fist → Zoom Out</div>
     <div class="gesture">✌ Two Fingers → Rotate</div>
-    <div class="gesture">🤏 Pinch → Strong Pull</div>
-    <div class="gesture">👉 Move Hand → Pan Energy</div>
+    <div class="gesture">🤏 Pinch → Scale Up</div>
+    <div class="gesture">👉 Move Hand → Pan View</div>
   </div>
 
   <div class="preview">
@@ -369,9 +369,27 @@
       hand.x += ((hand.detected ? hand.targetX : 0) - hand.x) * 0.12;
       hand.y += ((hand.detected ? hand.targetY : 0) - hand.y) * 0.12;
 
-      const expand = hand.detected ? THREE.MathUtils.clamp((hand.openness - 0.2) * 3.4, 0, 1.2) : 0;
-      const pull = hand.detected ? (hand.pinch ? 1.35 : hand.pointing || hand.fistLike ? 0.95 : 0.35) : 0;
-      const rotate = hand.rotateMode ? 0.015 : 0.003;
+      const isOpenHand = hand.detected && hand.openness > 0.26 && !hand.pinch && !hand.rotateMode && !hand.pointing && !hand.fistLike;
+      const isZoomOut = hand.detected && (hand.pointing || hand.fistLike);
+      const isRotate = hand.detected && hand.rotateMode;
+      const isScaleUp = hand.detected && hand.pinch;
+
+      const targetCameraZ = isOpenHand ? 30 : isZoomOut ? 56 : 44;
+      camera.position.z += (targetCameraZ - camera.position.z) * 0.08;
+
+      const targetScale = isScaleUp ? 1.55 : 1.0;
+      cloud.scale.x += (targetScale - cloud.scale.x) * 0.08;
+      cloud.scale.y += (targetScale - cloud.scale.y) * 0.08;
+      cloud.scale.z += (targetScale - cloud.scale.z) * 0.08;
+
+      const targetPanX = hand.detected ? hand.x * 0.45 : 0;
+      const targetPanY = hand.detected ? hand.y * 0.28 : 0;
+      camera.position.x += (targetPanX - camera.position.x) * 0.06;
+      camera.position.y += (targetPanY - camera.position.y) * 0.06;
+      camera.lookAt(0, 0, 0);
+
+      const rotate = isRotate ? 0.02 : 0.003;
+      const ambientPull = hand.detected ? (isScaleUp ? 1.15 : isZoomOut ? 0.35 : 0.18) : 0;
 
       cloud.rotation.y += rotate;
       cloud.rotation.x = Math.sin(t * 0.35) * 0.08;
@@ -379,7 +397,7 @@
 
       for (let i = 0; i < particleCount; i++) {
         const p = particleData[i];
-        const breathe = 1 + expand * 0.75;
+        const breathe = isOpenHand ? 1.22 : isZoomOut ? 0.9 : 1.0;
         const hx = p.homeX * breathe;
         const hy = p.homeY * breathe;
         const hz = p.homeZ * breathe;
@@ -398,7 +416,7 @@
           const dz = 0 - p.z;
           const d = Math.sqrt(dx * dx + dy * dy + dz * dz) + 0.0001;
           const influence = Math.max(0, 1 - d / 18);
-          const strength = Math.pow(influence, 1.7) * (0.04 + pull * 0.085);
+          const strength = Math.pow(influence, 1.7) * (0.03 + ambientPull * 0.085);
 
           p.vx += (dx / d) * strength;
           p.vy += (dy / d) * strength;
@@ -423,7 +441,7 @@
         const sway = Math.sin(t * sq.speed + sq.noise);
         m.position.x += ((sq.home.x + hand.x * 0.6 + sway * 1.8) - m.position.x) * 0.03;
         m.position.y += ((sq.home.y + hand.y * 0.45 + Math.cos(t * sq.speed + sq.noise) * 1.2) - m.position.y) * 0.03;
-        m.position.z += ((sq.home.z + (hand.pinch ? 4 : 0)) - m.position.z) * 0.025;
+        m.position.z += ((sq.home.z + (isScaleUp ? 6 : 0)) - m.position.z) * 0.025;
         m.rotation.z += 0.002 + sq.speed * 0.002;
       }
 
