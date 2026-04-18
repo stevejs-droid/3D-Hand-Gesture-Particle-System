@@ -1,320 +1,378 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Magic Circle Follow Point</title>
-<style>
-  html, body {
-    margin: 0;
-    width: 100%;
-    height: 100%;
-    overflow: hidden;
-    background: radial-gradient(circle at 50% 70%, #10162b 0%, #050913 45%, #000 100%);
-    font-family: Arial, sans-serif;
-  }
-
-  canvas.webgl {
-    display: block;
-  }
-
-  #video {
-    position: fixed;
-    right: 14px;
-    bottom: 14px;
-    width: 170px;
-    border-radius: 14px;
-    opacity: 0.78;
-    transform: scaleX(-1);
-    border: 1px solid rgba(255,255,255,0.12);
-    background: #000;
-    z-index: 5;
-  }
-
-  .hint {
-    position: fixed;
-    top: 14px;
-    left: 14px;
-    color: white;
-    background: rgba(255,255,255,0.06);
-    border: 1px solid rgba(255,255,255,0.12);
-    backdrop-filter: blur(10px);
-    padding: 12px 15px;
-    border-radius: 16px;
-    z-index: 6;
-    max-width: 360px;
-    line-height: 1.45;
-  }
-
-  .hint b {
-    display: block;
-    font-size: 20px;
-    margin-bottom: 4px;
-  }
-
-  .hint span {
-    font-size: 13px;
-    opacity: 0.88;
-  }
-
-  .status {
-    color: #9effac;
-    margin-top: 6px;
-    font-size: 12px;
-  }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Hand-Controlled Particle System</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #000; font-family: sans-serif; }
+        canvas { display: block; }
+        #video-container {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            width: 160px;
+            height: 120px;
+            border: 2px solid #333;
+            z-index: 10;
+            opacity: 0.7;
+            transform: scaleX(-1); /* Mirror the video */
+        }
+        video { width: 100%; height: 100%; object-fit: cover; }
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: #00ffcc;
+            pointer-events: none;
+            z-index: 10;
+            text-shadow: 0 0 5px #00ffcc;
+        }
+        h1 { font-size: 1.5rem; margin: 0; }
+        p { font-size: 0.9rem; margin-top: 5px; opacity: 0.8; }
+        .instruction { color: white; background: rgba(0,0,0,0.5); padding: 5px; border-radius: 4px; margin-top: 5px; display: inline-block;}
+    </style>
+    
+    <!-- Import Three.js and MediaPipe -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
 </head>
 <body>
-  <div class="hint">
-    <b>Magic Circle Particles</b>
-    <span>Particles form a glowing magic circle that orbits and follows where you point.</span>
-    <div id="status" class="status">Starting camera...</div>
-  </div>
-  <video id="video" autoplay playsinline muted></video>
 
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+    <div id="ui">
+        <h1>Interactive Particle Morphing</h1>
+        <div class="instruction">🖐 Move Hand: Rotate/Position</div><br>
+        <div class="instruction">👌 Pinch (Thumb+Index): Change Shape</div><br>
+        <div class="instruction">✊ Fist: Collapse | ✋ Open: Expand</div>
+        <p id="status">Loading AI Model...</p>
+    </div>
 
-  <script type="importmap">
-  {
-    "imports": {
-      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
-    }
-  }
-  </script>
+    <!-- Hidden video element for MediaPipe -->
+    <div id="video-container">
+        <video class="input_video"></video>
+    </div>
 
-  <script type="module">
-    import * as THREE from 'three';
-
-    const statusEl = document.getElementById('status');
-    const video = document.getElementById('video');
-
+<script>
+    // ==========================================
+    // 1. THREE.JS SETUP
+    // ==========================================
     const scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2(0x02040c, 0.006);
+    // Add subtle fog for depth
+    scene.fog = new THREE.FogExp2(0x000000, 0.002);
 
-    // Adjusted camera slightly higher to look down at the horizontal magic circle
-    const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(0, 30, 50);
-    camera.lookAt(0, 0, 0);
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.z = 30;
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.domElement.className = 'webgl';
     document.body.appendChild(renderer.domElement);
 
-    scene.add(new THREE.AmbientLight(0xffffff, 0.88));
-    const dir = new THREE.DirectionalLight(0xffffff, 1.0);
-    dir.position.set(10, 18, 10);
-    scene.add(dir);
-
-    const starGeo = new THREE.BufferGeometry();
-    const starCount = 450;
-    const starPos = new Float32Array(starCount * 3);
-    for (let i = 0; i < starCount; i++) {
-      starPos[i * 3] = (Math.random() - 0.5) * 160;
-      starPos[i * 3 + 1] = (Math.random() - 0.1) * 70;
-      starPos[i * 3 + 2] = -Math.random() * 120;
+    // ==========================================
+    // 2. PARTICLE SYSTEM ENGINE
+    // ==========================================
+    const PARTICLE_COUNT = 12000;
+    const geometry = new THREE.BufferGeometry();
+    
+    // Arrays for buffer attributes
+    const positions = new Float32Array(PARTICLE_COUNT * 3);
+    const colors = new Float32Array(PARTICLE_COUNT * 3);
+    const targetPositions = new Float32Array(PARTICLE_COUNT * 3); // Where particles want to go
+    
+    // Initialize random positions
+    for (let i = 0; i < PARTICLE_COUNT * 3; i++) {
+        positions[i] = (Math.random() - 0.5) * 100;
+        colors[i] = 1.0;
+        targetPositions[i] = positions[i];
     }
-    starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
-    const stars = new THREE.Points(
-      starGeo,
-      new THREE.PointsMaterial({ color: 0xc8d8ff, size: 0.16, transparent: true, opacity: 0.8 })
-    );
-    scene.add(stars);
 
-    // -- MAGIC CIRCLE IMPLEMENTATION --
-    const particleCount = 3000;
-    const data = [];
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
-    const c1 = new THREE.Color('#39ff8f'); // Neon green
-    const c2 = new THREE.Color('#d7ff37'); // Yellow/green
-    const c3 = new THREE.Color('#00f7ff');
-
-    // Cylinder to look like a glowing streak
-    const particleGeo = new THREE.CylinderGeometry(0.04, 0.04, 1.8, 5);
-    particleGeo.rotateX(Math.PI / 2); // Align length with Z-axis so lookAt works properly
-
-    const particleMat = new THREE.MeshBasicMaterial({
-      color: 0xffffff,
-      transparent: true,
-      opacity: 0.95,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false
-    });
-
-    // Use InstancedMesh instead of Points to support rotation/leaning
-    const instancedMesh = new THREE.InstancedMesh(particleGeo, particleMat, particleCount);
-    scene.add(instancedMesh);
-
-    const dummy = new THREE.Object3D();
-    const currentPositions = new Float32Array(particleCount * 3);
-
-    for (let i = 0; i < particleCount; i++) {
-      // Create a flat ring/disc shape
-      const radius = 8 + Math.pow(Math.random(), 1.5) * 20; 
-      const angle = Math.random() * Math.PI * 2;
-      const speed = (0.2 + Math.random() * 0.5) / radius; // Outer particles slower
-      const yOffset = (Math.random() - 0.5) * 1.5;
-
-      const blend = Math.random();
-      const col = c1.clone().lerp(c2, blend).lerp(c3, Math.random() * 0.15);
-      instancedMesh.setColorAt(i, col);
-
-      data.push({
-        radius,
-        angle,
-        speed,
-        yOffset,
-        lag: 0.05 + Math.random() * 0.05
-      });
-      
-      currentPositions[i * 3] = Math.cos(angle) * radius;
-      currentPositions[i * 3 + 1] = yOffset;
-      currentPositions[i * 3 + 2] = Math.sin(angle) * radius;
-    }
-    instancedMesh.instanceColor.needsUpdate = true;
-
-    const hand = {
-      seen: false,
-      targetX: 0,
-      targetY: 5,
-      targetZ: 0,
-      x: 0,
-      y: 5,
-      z: 0,
-      pinch: false
+    // Create a generated texture for the particle (glow dot)
+    const getSprite = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 32; canvas.height = 32;
+        const context = canvas.getContext('2d');
+        const gradient = context.createRadialGradient(16, 16, 0, 16, 16, 16);
+        gradient.addColorStop(0, 'rgba(255,255,255,1)');
+        gradient.addColorStop(0.2, 'rgba(255,255,255,0.8)');
+        gradient.addColorStop(0.5, 'rgba(255,255,255,0.2)');
+        gradient.addColorStop(1, 'rgba(0,0,0,0)');
+        context.fillStyle = gradient;
+        context.fillRect(0, 0, 32, 32);
+        const texture = new THREE.Texture(canvas);
+        texture.needsUpdate = true;
+        return texture;
     };
 
-    function updateHandFromLandmarks(landmarks) {
-      const tip = landmarks[8];
-      const thumb = landmarks[4];
-      const pinchDist = Math.hypot(tip.x - thumb.x, tip.y - thumb.y, tip.z - thumb.z);
+    const material = new THREE.PointsMaterial({
+        size: 0.6,
+        vertexColors: true,
+        map: getSprite(),
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        transparent: true
+    });
 
-      hand.seen = true;
-      hand.targetX = (0.5 - tip.x) * 60;
-      hand.targetY = 5 + (0.5 - tip.y) * 30;
-      hand.targetZ = tip.z * -50; 
-      hand.pinch = pinchDist < 0.06;
+    const particles = new THREE.Points(geometry, material);
+    scene.add(particles);
 
-      statusEl.textContent = hand.pinch
-        ? 'Pinch detected. Magic circle tightens.'
-        : 'Hand detected. Magic circle follows your finger.';
+    // ==========================================
+    // 3. SHAPE GENERATORS
+    // ==========================================
+    const shapes = ['sphere', 'heart', 'saturn', 'flower', 'torus'];
+    let currentShapeIndex = 0;
+
+    function getPointOnSphere(i) {
+        const phi = Math.acos(-1 + (2 * i) / PARTICLE_COUNT);
+        const theta = Math.sqrt(PARTICLE_COUNT * Math.PI) * phi;
+        const r = 10;
+        return {
+            x: r * Math.cos(theta) * Math.sin(phi),
+            y: r * Math.sin(theta) * Math.sin(phi),
+            z: r * Math.cos(phi),
+            r: 0.2, g: 0.6, b: 1.0 // Blueish
+        };
     }
 
-    const hands = new Hands({
-      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
-    });
+    function getPointOnHeart(i) {
+        // Parametric heart equation
+        const t = (i / PARTICLE_COUNT) * Math.PI * 2;
+        const x = 16 * Math.pow(Math.sin(t), 3);
+        const y = 13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t);
+        // Add some depth volume
+        const z = (Math.random() - 0.5) * 4; 
+        const scale = 0.6;
+        return {
+            x: x * scale, y: y * scale, z: z,
+            r: 1.0, g: 0.1, b: 0.3 // Red/Pink
+        };
+    }
+
+    function getPointOnSaturn(i) {
+        const ratio = 0.7; // 70% planet, 30% rings
+        const isPlanet = i < PARTICLE_COUNT * ratio;
+        
+        if (isPlanet) {
+            const idx = i;
+            const phi = Math.acos(-1 + (2 * idx) / (PARTICLE_COUNT*ratio));
+            const theta = Math.sqrt((PARTICLE_COUNT*ratio) * Math.PI) * phi;
+            const r = 6;
+            return {
+                x: r * Math.cos(theta) * Math.sin(phi),
+                y: r * Math.sin(theta) * Math.sin(phi),
+                z: r * Math.cos(phi),
+                r: 0.9, g: 0.8, b: 0.5 // Gold
+            };
+        } else {
+            // Ring
+            const idx = i - PARTICLE_COUNT * ratio;
+            const angle = (idx / (PARTICLE_COUNT * (1-ratio))) * Math.PI * 2 * 5; // multiple loops
+            const radius = 9 + Math.random() * 4;
+            return {
+                x: radius * Math.cos(angle),
+                y: (Math.random()-0.5), // Flattened y
+                z: radius * Math.sin(angle),
+                r: 0.6, g: 0.6, b: 0.7
+            };
+        }
+    }
+
+    function getPointOnFlower(i) {
+        const theta = (i / PARTICLE_COUNT) * Math.PI * 100; // lots of winding
+        // Rose curve: r = cos(k * theta)
+        const k = 4;
+        const r = 12 * Math.cos(k * theta);
+        const x = r * Math.cos(theta);
+        const y = r * Math.sin(theta);
+        const z = (Math.random() - 0.5) * 5;
+        return {
+            x: x, y: y, z: z,
+            r: 0.8, g: 0.2, b: 1.0 // Purple
+        };
+    }
+
+    function getPointOnTorus(i) {
+        const u = Math.random() * Math.PI * 2;
+        const v = Math.random() * Math.PI * 2;
+        const R = 8; const r = 3;
+        const x = (R + r * Math.cos(v)) * Math.cos(u);
+        const y = (R + r * Math.cos(v)) * Math.sin(u);
+        const z = r * Math.sin(v);
+        return {
+            x: x, y: y, z: z,
+            r: 0.0, g: 1.0, b: 0.5 // Teal
+        };
+    }
+
+    // Function to calculate all target positions based on current shape
+    function setTargetShape(shapeName) {
+        const colorAttr = particles.geometry.attributes.color;
+        
+        for (let i = 0; i < PARTICLE_COUNT; i++) {
+            let p;
+            if(shapeName === 'sphere') p = getPointOnSphere(i);
+            else if(shapeName === 'heart') p = getPointOnHeart(i);
+            else if(shapeName === 'saturn') p = getPointOnSaturn(i);
+            else if(shapeName === 'flower') p = getPointOnFlower(i);
+            else p = getPointOnTorus(i);
+
+            // Store target
+            targetPositions[i * 3] = p.x;
+            targetPositions[i * 3 + 1] = p.y;
+            targetPositions[i * 3 + 2] = p.z;
+
+            // Update colors immediately for effect
+            colorAttr.setXYZ(i, p.r, p.g, p.b);
+        }
+        colorAttr.needsUpdate = true;
+    }
+
+    // Initial shape
+    setTargetShape(shapes[0]);
+
+    // ==========================================
+    // 4. MEDIAPIPE HAND TRACKING
+    // ==========================================
+    const videoElement = document.getElementsByClassName('input_video')[0];
+    const statusText = document.getElementById('status');
+    
+    let handX = 0, handY = 0;
+    let isPinching = false;
+    let isFist = false;
+    let lastPinchTime = 0;
+    
+    function onResults(results) {
+        statusText.innerText = "System Active";
+        statusText.style.color = "#0f0";
+
+        if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+            const landmarks = results.multiHandLandmarks[0];
+
+            // 1. Position Tracking (Index Finger Tip - Landmark 8)
+            const x = landmarks[8].x;
+            const y = landmarks[8].y;
+            
+            // Map 0..1 to -1..1 range for Three.js logic
+            // Note: MediaPipe x is mirrored relative to ThreeJS usually, but we want interaction to feel natural
+            handX = (0.5 - x) * 2; 
+            handY = (0.5 - y) * 2;
+
+            // 2. Pinch Detection (Thumb Tip 4 vs Index Tip 8)
+            const dx = landmarks[8].x - landmarks[4].x;
+            const dy = landmarks[8].y - landmarks[4].y;
+            const dz = landmarks[8].z - landmarks[4].z; // z is roughly estimated
+            const distance = Math.sqrt(dx*dx + dy*dy + dz*dz);
+            
+            if (distance < 0.05) {
+                if (!isPinching && Date.now() - lastPinchTime > 500) {
+                    // Trigger Shape Switch
+                    currentShapeIndex = (currentShapeIndex + 1) % shapes.length;
+                    setTargetShape(shapes[currentShapeIndex]);
+                    lastPinchTime = Date.now();
+                }
+                isPinching = true;
+            } else {
+                isPinching = false;
+            }
+
+            // 3. Fist Detection (Tip of fingers vs Wrist/Palm)
+            // Simple check: Is index tip (8) close to wrist (0)?
+            const dFist = Math.sqrt(
+                Math.pow(landmarks[8].x - landmarks[0].x, 2) + 
+                Math.pow(landmarks[8].y - landmarks[0].y, 2)
+            );
+            isFist = (dFist < 0.3); // Threshold for fist
+        }
+    }
+
+    const hands = new Hands({locateFile: (file) => {
+        return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+    }});
 
     hands.setOptions({
-      maxNumHands: 1,
-      modelComplexity: 1,
-      minDetectionConfidence: 0.6,
-      minTrackingConfidence: 0.6
+        maxNumHands: 1,
+        modelComplexity: 1,
+        minDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.5
     });
 
-    hands.onResults((results) => {
-      if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-        updateHandFromLandmarks(results.multiHandLandmarks[0]);
-      } else {
-        hand.seen = false;
-        statusEl.textContent = 'No hand detected. Show one hand clearly to the camera.';
-      }
+    hands.onResults(onResults);
+
+    const cameraUtils = new Camera(videoElement, {
+        onFrame: async () => {
+            await hands.send({image: videoElement});
+        },
+        width: 320,
+        height: 240
     });
+    cameraUtils.start();
 
-    async function startCamera() {
-      try {
-        statusEl.textContent = 'Requesting camera access...';
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { width: 640, height: 480, facingMode: 'user' },
-          audio: false
-        });
-
-        video.srcObject = stream;
-        await video.play();
-
-        const mpCamera = new Camera(video, {
-          onFrame: async () => {
-            await hands.send({ image: video });
-          },
-          width: 640,
-          height: 480
-        });
-
-        mpCamera.start();
-        statusEl.textContent = 'Camera started. Point with your finger.';
-      } catch (err) {
-        console.error(err);
-        statusEl.textContent = 'Camera failed. Allow permission and run on GitHub Pages or localhost.';
-      }
-    }
-
-    if (location.protocol === 'https:' || location.hostname === 'localhost') {
-      startCamera();
-    } else {
-      statusEl.textContent = 'This needs HTTPS. GitHub Pages will work.';
-    }
-
+    // ==========================================
+    // 5. ANIMATION LOOP
+    // ==========================================
     const clock = new THREE.Clock();
 
     function animate() {
-      requestAnimationFrame(animate);
-      const t = clock.getElapsedTime();
-
-      // Smoothly move the center of the magic circle to the hand
-      hand.x += ((hand.seen ? hand.targetX : 0) - hand.x) * 0.08;
-      hand.y += ((hand.seen ? hand.targetY : 5) - hand.y) * 0.08;
-      hand.z += ((hand.seen ? hand.targetZ : 0) - hand.z) * 0.08;
-
-      const tighten = hand.pinch ? 0.4 : 1.0;
-      const speedUp = hand.pinch ? 2.5 : 1.0;
-
-      for (let i = 0; i < particleCount; i++) {
-        const p = data[i];
+        requestAnimationFrame(animate);
         
-        // Advance orbit angle
-        p.angle += p.speed * speedUp;
+        const time = clock.getElapsedTime();
+        const positionsAttribute = particles.geometry.attributes.position;
+        const currentPositions = positionsAttribute.array;
 
-        // Calculate target orbit position around the hand
-        const r = p.radius * tighten;
-        const targetX = hand.x + Math.cos(p.angle) * r;
-        const targetY = hand.y + p.yOffset + Math.sin(t * 2.0 + p.angle) * 0.5; // Slight wave
-        const targetZ = hand.z + Math.sin(p.angle) * r;
+        // Interaction Logic
+        // Map hand X/Y to scene rotation and scale
+        const targetRotationX = handY * 1;
+        const targetRotationY = handX * 1;
+        
+        // Smooth rotation
+        particles.rotation.x += (targetRotationX - particles.rotation.x) * 0.1;
+        particles.rotation.y += (targetRotationY - particles.rotation.y) * 0.1;
 
-        // Eased movement towards target
-        currentPositions[i * 3] += (targetX - currentPositions[i * 3]) * p.lag;
-        currentPositions[i * 3 + 1] += (targetY - currentPositions[i * 3 + 1]) * p.lag;
-        currentPositions[i * 3 + 2] += (targetZ - currentPositions[i * 3 + 2]) * p.lag;
+        // Expansion/Contraction Logic
+        let expansionFactor = 1.0;
+        if(isFist) expansionFactor = 0.1; // Implode
+        else if(isPinching) expansionFactor = 1.2; // Slight grow on pinch
+        else expansionFactor = 1.5; // Normal open hand state (slightly expanded)
 
-        const cx = currentPositions[i * 3];
-        const cy = currentPositions[i * 3 + 1];
-        const cz = currentPositions[i * 3 + 2];
+        for (let i = 0; i < PARTICLE_COUNT; i++) {
+            const ix = i * 3;
+            const iy = i * 3 + 1;
+            const iz = i * 3 + 2;
 
-        dummy.position.set(cx, cy, cz);
+            // Get target
+            let tx = targetPositions[ix] * expansionFactor;
+            let ty = targetPositions[iy] * expansionFactor;
+            let tz = targetPositions[iz] * expansionFactor;
 
-        // Make the streak lean towards its future position along the orbit (tangent)
-        const tangentX = cx + Math.cos(p.angle + Math.PI / 2) * r;
-        const tangentY = cy; // Keep horizontal lean
-        const tangentZ = cz + Math.sin(p.angle + Math.PI / 2) * r;
+            // Add dynamic noise (drifting particles)
+            const noise = Math.sin(time + i) * 0.05;
 
-        dummy.lookAt(tangentX, tangentY, tangentZ);
-        dummy.updateMatrix();
-        instancedMesh.setMatrixAt(i, dummy.matrix);
-      }
+            // Linear Interpolation (Lerp) current pos to target pos
+            // Speed depends on state
+            const speed = isFist ? 0.2 : 0.05;
 
-      instancedMesh.instanceMatrix.needsUpdate = true;
-      stars.rotation.y += 0.0005;
-      renderer.render(scene, camera);
+            currentPositions[ix] += (tx - currentPositions[ix]) * speed + noise;
+            currentPositions[iy] += (ty - currentPositions[iy]) * speed + noise;
+            currentPositions[iz] += (tz - currentPositions[iz]) * speed + noise;
+        }
+
+        positionsAttribute.needsUpdate = true;
+        renderer.render(scene, camera);
     }
 
-    animate();
-
+    // Handle Window Resize
     window.addEventListener('resize', () => {
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
     });
-  </script>
+
+    animate();
+</script>
 </body>
 </html>
