@@ -152,7 +152,7 @@
     <div class="gesture">👉 Move Hand → Pan View</div>
   </div>
 
-  <div class="statusBox" id="statusBox">Camera Error: Please allow camera access</div>
+  
 
   <div class="previewFrame">
     <video id="video" autoplay playsinline muted></video>
@@ -325,14 +325,13 @@
       } else {
         hand.detected = false;
         stateTitle.textContent = 'No Hand Detected';
-        statusBox.style.display = 'block';
-        statusBox.textContent = 'Camera Error: Please allow camera access';
+        
       }
     });
 
     async function startCamera() {
       try {
-        statusBox.textContent = 'Starting camera...';
+        
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { width: 640, height: 480, facingMode: 'user' },
           audio: false
@@ -350,11 +349,10 @@
         });
 
         cam.start();
-        statusBox.textContent = 'Show your hand to begin';
+        
       } catch (err) {
         console.error(err);
-        statusBox.style.display = 'block';
-        statusBox.textContent = 'Camera Error: Please allow camera access';
+        
       }
     }
 
