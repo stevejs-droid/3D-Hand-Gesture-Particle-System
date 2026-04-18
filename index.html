@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Gesture Particle Field</title>
+<title>Gesture Particle Space</title>
 <style>
   * { box-sizing: border-box; }
   html, body {
@@ -21,31 +21,31 @@
 
   .panel {
     position: fixed;
-    top: 24px;
-    left: 24px;
-    width: 340px;
+    top: 22px;
+    left: 22px;
+    width: 330px;
     z-index: 20;
     color: white;
     padding: 22px;
-    border-radius: 22px;
-    background: linear-gradient(180deg, rgba(10,14,18,0.92), rgba(6,8,12,0.86));
-    border: 1px solid rgba(255,255,255,0.16);
-    box-shadow: 0 20px 60px rgba(0,0,0,0.45), inset 0 0 30px rgba(0,255,120,0.05);
+    border-radius: 24px;
+    background: linear-gradient(180deg, rgba(8, 12, 16, 0.94), rgba(3, 5, 8, 0.88));
+    border: 1px solid rgba(255,255,255,0.12);
+    box-shadow: 0 18px 60px rgba(0,0,0,0.5), inset 0 0 32px rgba(0,255,110,0.04);
     backdrop-filter: blur(10px);
   }
 
-  .panel .small {
-    color: #31d158;
+  .panel .label {
+    color: #22c55e;
     font-weight: 700;
-    font-size: 18px;
+    font-size: 16px;
     margin-bottom: 18px;
   }
 
   .panel h1 {
     margin: 0 0 18px;
-    font-size: 30px;
+    font-size: 28px;
     line-height: 1.1;
-    color: #00ff84;
+    color: #00ff7a;
   }
 
   .gesture {
@@ -55,40 +55,23 @@
     padding: 12px 14px;
     margin-bottom: 10px;
     border-radius: 12px;
-    background: rgba(255,255,255,0.06);
+    background: rgba(255,255,255,0.05);
     border: 1px solid rgba(255,255,255,0.04);
-    font-size: 16px;
+    font-size: 15px;
   }
 
-  .statusBox {
+  .preview {
     position: fixed;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
-    z-index: 25;
-    color: white;
-    font-size: 26px;
-    padding: 22px 28px;
-    border-radius: 20px;
-    background: rgba(0,0,0,0.55);
-    backdrop-filter: blur(8px);
-    border: 1px solid rgba(255,255,255,0.08);
-    text-align: center;
-    min-width: 420px;
-  }
-
-  .previewFrame {
-    position: fixed;
-    top: 24px;
-    right: 24px;
-    width: 275px;
-    height: 200px;
-    z-index: 21;
+    top: 22px;
+    right: 22px;
+    width: 270px;
+    height: 195px;
+    z-index: 20;
     border-radius: 22px;
-    border: 1px solid rgba(255,255,255,0.16);
+    border: 1px solid rgba(255,255,255,0.14);
+    overflow: hidden;
     background: rgba(255,255,255,0.02);
     box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04);
-    overflow: hidden;
   }
 
   #video {
@@ -96,24 +79,31 @@
     height: 100%;
     object-fit: cover;
     transform: scaleX(-1);
-    opacity: 0.28;
+    opacity: 0.3;
     background: #000;
   }
 
-  .previewOverlay {
-    position: absolute;
-    inset: 0;
-    border-radius: 22px;
-    box-shadow: inset 0 0 0 2px rgba(255,255,255,0.08);
-    pointer-events: none;
-  }
-
-  .bottomHint {
+  .subtle {
     position: fixed;
     left: 24px;
     bottom: 18px;
+    color: rgba(255,255,255,0.6);
     z-index: 20;
-    color: rgba(255,255,255,0.68);
+    font-size: 13px;
+  }
+
+  .mini {
+    position: fixed;
+    left: 50%;
+    top: 26px;
+    transform: translateX(-50%);
+    z-index: 21;
+    color: rgba(255,255,255,0.9);
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    padding: 10px 14px;
+    border-radius: 999px;
+    backdrop-filter: blur(10px);
     font-size: 14px;
   }
 
@@ -125,41 +115,40 @@
       padding: 16px;
     }
 
-    .previewFrame {
-      width: 160px;
-      height: 120px;
-      right: 12px;
+    .preview {
+      width: 150px;
+      height: 110px;
       top: 12px;
+      right: 12px;
     }
 
-    .statusBox {
-      min-width: unset;
-      width: calc(100vw - 40px);
-      font-size: 20px;
-      padding: 18px 20px;
+    .mini {
+      top: auto;
+      bottom: 12px;
+      font-size: 12px;
+      max-width: calc(100vw - 24px);
+      text-align: center;
     }
   }
 </style>
 </head>
 <body>
   <div class="panel">
-    <div class="small">🎮 Gesture Controls</div>
+    <div class="label">🎮 Gesture Controls</div>
     <h1 id="stateTitle">No Hand Detected</h1>
     <div class="gesture">🖐 Open Hand → Expand Field</div>
-    <div class="gesture">☝ Pointing / ✊ Fist → Pull In</div>
-    <div class="gesture">✌ Two Fingers → Rotate Drift</div>
-    <div class="gesture">🤏 Pinch → Scale Up</div>
-    <div class="gesture">👉 Move Hand → Pan View</div>
+    <div class="gesture">☝ Point / ✊ Fist → Pull In</div>
+    <div class="gesture">✌ Two Fingers → Rotate</div>
+    <div class="gesture">🤏 Pinch → Strong Pull</div>
+    <div class="gesture">👉 Move Hand → Pan Energy</div>
   </div>
 
-  
-
-  <div class="previewFrame">
+  <div class="preview">
     <video id="video" autoplay playsinline muted></video>
-    <div class="previewOverlay"></div>
   </div>
 
-  <div class="bottomHint">Allow camera • Run on HTTPS • Best with one clear hand</div>
+  <div class="mini" id="miniStatus">Allow camera to enable gesture control</div>
+  <div class="subtle">Run on HTTPS • Best with one clear hand • White square particles</div>
 
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
@@ -176,14 +165,14 @@
     import * as THREE from 'three';
 
     const video = document.getElementById('video');
-    const statusBox = document.getElementById('statusBox');
     const stateTitle = document.getElementById('stateTitle');
+    const miniStatus = document.getElementById('miniStatus');
 
     const scene = new THREE.Scene();
-    scene.fog = new THREE.Fog(0x000000, 40, 110);
+    scene.fog = new THREE.Fog(0x000000, 34, 120);
 
     const camera = new THREE.PerspectiveCamera(58, innerWidth / innerHeight, 0.1, 1000);
-    camera.position.set(0, 0, 42);
+    camera.position.set(0, 0, 44);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setSize(innerWidth, innerHeight);
@@ -191,38 +180,37 @@
     renderer.domElement.className = 'webgl';
     document.body.appendChild(renderer.domElement);
 
-    scene.add(new THREE.AmbientLight(0xffffff, 0.9));
+    scene.add(new THREE.AmbientLight(0xffffff, 1));
 
-    const particleCount = 7000;
+    const particleCount = 8500;
     const positions = new Float32Array(particleCount * 3);
     const colors = new Float32Array(particleCount * 3);
-    const sizes = new Float32Array(particleCount);
-    const particles = [];
+    const particleData = [];
     const geometry = new THREE.BufferGeometry();
 
     for (let i = 0; i < particleCount; i++) {
-      const spread = 34 + Math.random() * 20;
+      const spread = 26 + Math.random() * 22;
       const x = (Math.random() - 0.5) * spread * 2.2;
-      const y = (Math.random() - 0.5) * spread * 1.8;
-      const z = (Math.random() - 0.5) * spread * 1.6;
+      const y = (Math.random() - 0.5) * spread * 1.9;
+      const z = (Math.random() - 0.5) * spread * 1.7;
 
       positions[i * 3] = x;
       positions[i * 3 + 1] = y;
       positions[i * 3 + 2] = z;
 
-      const shade = 0.7 + Math.random() * 0.3;
+      const shade = 0.72 + Math.random() * 0.28;
       colors[i * 3] = shade;
       colors[i * 3 + 1] = shade;
       colors[i * 3 + 2] = shade;
-      sizes[i] = Math.random() < 0.92 ? 1 : 2.5 + Math.random() * 3.5;
 
-      particles.push({
+      particleData.push({
         x, y, z,
         vx: 0, vy: 0, vz: 0,
         homeX: x, homeY: y, homeZ: z,
         noise: Math.random() * Math.PI * 2,
         drift: 0.002 + Math.random() * 0.004,
-        drag: 0.91 + Math.random() * 0.03,
+        drag: 0.9 + Math.random() * 0.04,
+        sizeBias: Math.random(),
       });
     }
 
@@ -230,34 +218,55 @@
     geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
     const material = new THREE.PointsMaterial({
-      size: 0.28,
+      size: 0.33,
       vertexColors: true,
       transparent: true,
-      opacity: 0.96,
+      opacity: 0.98,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
-      sizeAttenuation: true
+      sizeAttenuation: true,
     });
 
     const cloud = new THREE.Points(geometry, material);
     scene.add(cloud);
 
+    const bigSquares = [];
+    const squareGeo = new THREE.PlaneGeometry(1, 1);
+    const squareMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.92, side: THREE.DoubleSide });
+
+    for (let i = 0; i < 85; i++) {
+      const m = new THREE.Mesh(squareGeo, squareMat.clone());
+      const s = 0.18 + Math.random() * 1.8;
+      m.scale.set(s, s, 1);
+      m.position.set((Math.random() - 0.5) * 90, (Math.random() - 0.5) * 70, (Math.random() - 0.5) * 45);
+      m.material.opacity = 0.38 + Math.random() * 0.55;
+      scene.add(m);
+      bigSquares.push({
+        mesh: m,
+        home: m.position.clone(),
+        noise: Math.random() * Math.PI * 2,
+        speed: 0.15 + Math.random() * 0.35,
+      });
+    }
+
     const hand = {
       detected: false,
-      x: 0, y: 0,
-      targetX: 0, targetY: 0,
+      x: 0,
+      y: 0,
+      targetX: 0,
+      targetY: 0,
       openness: 0,
       pinch: false,
       rotateMode: false,
       pointing: false,
-      strength: 0,
+      fistLike: false,
     };
 
-    function distance(a, b) {
+    function dist(a, b) {
       return Math.hypot(a.x - b.x, a.y - b.y, (a.z || 0) - (b.z || 0));
     }
 
-    function classifyHand(landmarks) {
+    function classify(landmarks) {
       const wrist = landmarks[0];
       const thumbTip = landmarks[4];
       const indexTip = landmarks[8];
@@ -265,28 +274,18 @@
       const ringTip = landmarks[16];
       const pinkyTip = landmarks[20];
 
-      const openness = (
-        distance(indexTip, wrist) +
-        distance(middleTip, wrist) +
-        distance(ringTip, wrist) +
-        distance(pinkyTip, wrist)
-      ) / 4;
+      const indexOpen = dist(indexTip, wrist) > 0.22;
+      const middleOpen = dist(middleTip, wrist) > 0.22;
+      const ringOpen = dist(ringTip, wrist) > 0.2;
+      const pinkyOpen = dist(pinkyTip, wrist) > 0.18;
 
-      const pinch = distance(thumbTip, indexTip) < 0.055;
-      const indexOpen = distance(indexTip, wrist) > 0.22;
-      const middleOpen = distance(middleTip, wrist) > 0.22;
-      const ringOpen = distance(ringTip, wrist) > 0.20;
-      const pinkyOpen = distance(pinkyTip, wrist) > 0.18;
-
-      const pointing = indexOpen && !middleOpen && !ringOpen && !pinkyOpen;
+      const openness = (dist(indexTip, wrist) + dist(middleTip, wrist) + dist(ringTip, wrist) + dist(pinkyTip, wrist)) / 4;
+      const pinch = dist(thumbTip, indexTip) < 0.055;
       const rotateMode = indexOpen && middleOpen && !ringOpen;
+      const pointing = indexOpen && !middleOpen && !ringOpen && !pinkyOpen;
+      const fistLike = !indexOpen && !middleOpen && !ringOpen && !pinkyOpen;
 
-      return {
-        openness,
-        pinch,
-        pointing,
-        rotateMode,
-      };
+      return { openness, pinch, rotateMode, pointing, fistLike };
     }
 
     const hands = new Hands({
@@ -304,34 +303,34 @@
       if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
         const lm = results.multiHandLandmarks[0];
         const idx = lm[8];
-        const gesture = classifyHand(lm);
+        const g = classify(lm);
 
         hand.detected = true;
-        hand.targetX = (0.5 - idx.x) * 18;
-        hand.targetY = (0.5 - idx.y) * 12;
-        hand.openness = gesture.openness;
-        hand.pinch = gesture.pinch;
-        hand.rotateMode = gesture.rotateMode;
-        hand.pointing = gesture.pointing;
-        hand.strength = THREE.MathUtils.clamp((gesture.openness - 0.16) * 4, 0, 1);
+        hand.targetX = (0.5 - idx.x) * 20;
+        hand.targetY = (0.5 - idx.y) * 14;
+        hand.openness = g.openness;
+        hand.pinch = g.pinch;
+        hand.rotateMode = g.rotateMode;
+        hand.pointing = g.pointing;
+        hand.fistLike = g.fistLike;
 
-        if (gesture.pinch) stateTitle.textContent = 'Pinch Detected';
-        else if (gesture.rotateMode) stateTitle.textContent = 'Rotate Gesture';
-        else if (gesture.pointing) stateTitle.textContent = 'Pointing Detected';
-        else if (gesture.openness > 0.26) stateTitle.textContent = 'Open Hand Detected';
-        else stateTitle.textContent = 'Fist / Pull Mode';
+        if (g.pinch) stateTitle.textContent = 'Pinch Detected';
+        else if (g.rotateMode) stateTitle.textContent = 'Rotate Gesture';
+        else if (g.pointing) stateTitle.textContent = 'Pointing Detected';
+        else if (g.openness > 0.26) stateTitle.textContent = 'Open Hand Detected';
+        else if (g.fistLike) stateTitle.textContent = 'Fist Detected';
+        else stateTitle.textContent = 'Hand Detected';
 
-        statusBox.style.display = 'none';
+        miniStatus.textContent = 'Gesture control active';
       } else {
         hand.detected = false;
         stateTitle.textContent = 'No Hand Detected';
-        
+        miniStatus.textContent = 'Allow camera to enable gesture control';
       }
     });
 
     async function startCamera() {
       try {
-        
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { width: 640, height: 480, facingMode: 'user' },
           audio: false
@@ -349,10 +348,10 @@
         });
 
         cam.start();
-        
+        miniStatus.textContent = 'Show your hand to begin';
       } catch (err) {
         console.error(err);
-        
+        miniStatus.textContent = 'Camera not available';
       }
     }
 
@@ -370,44 +369,40 @@
       hand.x += ((hand.detected ? hand.targetX : 0) - hand.x) * 0.12;
       hand.y += ((hand.detected ? hand.targetY : 0) - hand.y) * 0.12;
 
-      const expandStrength = hand.detected ? THREE.MathUtils.clamp((hand.openness - 0.2) * 3.2, 0, 1) : 0;
-      const pullStrength = hand.detected ? (hand.pinch || hand.pointing ? 1 : 0.35) : 0;
-      const rotateAmount = hand.rotateMode ? 0.012 : 0.002;
+      const expand = hand.detected ? THREE.MathUtils.clamp((hand.openness - 0.2) * 3.4, 0, 1.2) : 0;
+      const pull = hand.detected ? (hand.pinch ? 1.35 : hand.pointing || hand.fistLike ? 0.95 : 0.35) : 0;
+      const rotate = hand.rotateMode ? 0.015 : 0.003;
 
-      cloud.rotation.y += rotateAmount;
-      cloud.rotation.x = Math.sin(t * 0.3) * 0.08;
+      cloud.rotation.y += rotate;
+      cloud.rotation.x = Math.sin(t * 0.35) * 0.08;
+      cloud.rotation.z = Math.cos(t * 0.18) * 0.04;
 
       for (let i = 0; i < particleCount; i++) {
-        const p = particles[i];
+        const p = particleData[i];
+        const breathe = 1 + expand * 0.75;
+        const hx = p.homeX * breathe;
+        const hy = p.homeY * breathe;
+        const hz = p.homeZ * breathe;
 
-        const breathe = 1 + expandStrength * 0.65;
-        const homeX = p.homeX * breathe;
-        const homeY = p.homeY * breathe;
-        const homeZ = p.homeZ * breathe;
+        p.vx += (hx - p.x) * 0.0026;
+        p.vy += (hy - p.y) * 0.0026;
+        p.vz += (hz - p.z) * 0.0026;
 
-        const toHomeX = homeX - p.x;
-        const toHomeY = homeY - p.y;
-        const toHomeZ = homeZ - p.z;
-
-        p.vx += toHomeX * 0.0028;
-        p.vy += toHomeY * 0.0028;
-        p.vz += toHomeZ * 0.0028;
-
-        p.vx += Math.cos(t + p.noise) * p.drift * 0.4;
-        p.vy += Math.sin(t * 1.1 + p.noise) * p.drift * 0.4;
-        p.vz += Math.cos(t * 0.8 + p.noise) * p.drift * 0.4;
+        p.vx += Math.cos(t + p.noise) * p.drift * 0.45;
+        p.vy += Math.sin(t * 1.1 + p.noise) * p.drift * 0.45;
+        p.vz += Math.cos(t * 0.9 + p.noise) * p.drift * 0.45;
 
         if (hand.detected) {
           const dx = hand.x - p.x;
           const dy = hand.y - p.y;
           const dz = 0 - p.z;
-          const dist = Math.sqrt(dx * dx + dy * dy + dz * dz) + 0.0001;
-          const influence = Math.max(0, 1 - dist / 18);
-          const pull = Math.pow(influence, 1.7) * (0.05 + pullStrength * 0.08);
+          const d = Math.sqrt(dx * dx + dy * dy + dz * dz) + 0.0001;
+          const influence = Math.max(0, 1 - d / 18);
+          const strength = Math.pow(influence, 1.7) * (0.04 + pull * 0.085);
 
-          p.vx += (dx / dist) * pull;
-          p.vy += (dy / dist) * pull;
-          p.vz += (dz / dist) * pull * 0.8;
+          p.vx += (dx / d) * strength;
+          p.vy += (dy / d) * strength;
+          p.vz += (dz / d) * strength * 0.8;
         }
 
         p.vx *= p.drag;
@@ -421,6 +416,15 @@
         pos[i * 3] = p.x;
         pos[i * 3 + 1] = p.y;
         pos[i * 3 + 2] = p.z;
+      }
+
+      for (const sq of bigSquares) {
+        const m = sq.mesh;
+        const sway = Math.sin(t * sq.speed + sq.noise);
+        m.position.x += ((sq.home.x + hand.x * 0.6 + sway * 1.8) - m.position.x) * 0.03;
+        m.position.y += ((sq.home.y + hand.y * 0.45 + Math.cos(t * sq.speed + sq.noise) * 1.2) - m.position.y) * 0.03;
+        m.position.z += ((sq.home.z + (hand.pinch ? 4 : 0)) - m.position.z) * 0.025;
+        m.rotation.z += 0.002 + sq.speed * 0.002;
       }
 
       geometry.attributes.position.needsUpdate = true;
